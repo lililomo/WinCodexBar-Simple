@@ -1,116 +1,73 @@
-# WinCodexBar
+<h1 align="center">WinCodexBar</h1>
 
-A small Windows system-tray app that shows AI coding usage/limits for **Claude**, **GitHub Copilot**,
-and **OpenAI** — a Windows take on the macOS app [CodexBar](https://codexbar.app/).
+<p align="center">
+  A lightweight Windows system-tray app that shows your <b>AI usage at a glance</b> —
+  Claude, ChatGPT / Codex, and GitHub Copilot — in one tidy popup.
+</p>
 
-Left-click the tray icon for a popover with usage bars and reset countdowns. Right-click for the menu
-(Refresh, Copilot device login, edit settings, quit).
+<p align="center">
+  <img alt=".NET" src="https://img.shields.io/badge/.NET-8.0%20(WinForms)-512BD4">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
 
----
+<p align="center">
+  <img src="docs/panel.png" alt="Usage panel" width="320">
+  &nbsp;&nbsp;
+  <img src="docs/settings.png" alt="Settings" width="360">
+</p>
 
-## Read this first — what is and isn't solid
-
-The tray UI is the easy part. The hard part is getting usage data, because every provider exposes it
-through **undocumented / reverse-engineered** surfaces that break periodically. CodexBar itself has open
-bugs where the Claude session dies every ~8h (OAuth) or ~30 days (cookie). Expect the same fragility here.
-
-| Provider | Path used | Confidence | Notes |
-|---|---|---|---|
-| Claude | `claude.ai` sessionKey cookie → `/api/organizations` + `/api/organizations/{id}/usage` | **High** on endpoints | Inner field names (`utilization`, `resets_at`) are parsed defensively — `// VERIFY` |
-| OpenAI | Admin key → `/v1/organization/costs` (legacy credit fallback) | Medium | API only exposes **spend**, not subscription windows. `// VERIFY` |
-| Copilot | GitHub token → `copilot_internal/user` | Medium | Unofficial endpoint. `// VERIFY` |
-
-Lines marked `// VERIFY` in the source are the ones to check against a live response the first time you run.
-Failures are handled gracefully: a broken provider shows an error in its card instead of crashing the app.
-
-> I could not compile this in my environment (no .NET SDK there), so treat it as carefully-written but
-> un-compiled. If the compiler flags anything, it'll be a small fix.
+> A Windows port, in spirit, of the macOS **[CodexBar](https://github.com/steipete/CodexBar)** — same idea, native WinForms.
 
 ---
 
-## Build & run
+## ✨ Features
 
-Requires the **.NET 8 SDK** (Windows). https://dotnet.microsoft.com/download
+- **One-glance usage panel** — session / weekly quota bars, reset countdowns, plan, and pay-as-you-go spend.
+- **Three providers in one place** — Claude, ChatGPT / Codex, and GitHub Copilot.
+- **Sign in from your browser** — no manual token pasting for Copilot & ChatGPT (OAuth / device flow).
+- **Only shows what's logged in** — providers you haven't connected stay hidden.
+- **Tray-native** — a tiny coloured bar icon that tints by your highest utilization; left-click for the panel, right-click for the menu.
+- **Customisable panel** — adjustable transparency, always-on-top, and either *dock to tray* or *free-floating* (drag anywhere, position remembered).
+- **Manual refresh** — the ⟳ button in the panel, plus auto-refresh on an interval.
 
-```powershell
-cd WinCodexBar
+## 🔌 Providers & how they connect
+
+| Provider | How it authenticates |
+| --- | --- |
+| **Claude** (Pro / Max) | Reuses the token the **Claude Code** CLI already stores in `~/.claude/.credentials.json`, then calls Anthropic's usage API. When the token expires it is refreshed automatically via *delegated refresh* (it runs the official Claude Code CLI). A `claude.ai` `sessionKey` can be pasted as a fallback. |
+| **ChatGPT / Codex** | "Sign in with ChatGPT" — browser OAuth (PKCE) on a localhost loopback. Shows plan and login status. |
+| **GitHub Copilot** | GitHub device-flow login (open the URL, enter the code), then reads quota snapshots. |
+
+> ⚠️ The Claude and ChatGPT endpoints used here are **unofficial / undocumented** (the same ones the official desktop tools use internally) and may change without notice.
+
+## 🚀 Build & run
+
+Requirements: Windows 10/11 and the [.NET SDK](https://dotnet.microsoft.com/download) (8.0 or newer).
+
+```bash
+git clone https://github.com/lililomo/WinCodexBar-Simple.git
+cd WinCodexBar-Simple
 dotnet run
 ```
 
-A two-bar icon appears in the tray. Build a single distributable .exe:
+An icon appears in your system tray. Right-click it → **Login** to connect a provider.
 
-```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
-# output: bin\Release\net8.0-windows\win-x64\publish\WinCodexBar.exe
-```
+## ⚙️ Configuration
 
-To launch at login, drop a shortcut to the .exe in `shell:startup`.
+Settings live in `%AppData%\WinCodexBar\config.json` (created on first run). Most options are also in the
+tray's **Settings…** dialog:
 
----
+- **Transparency** of the panel (20–100%)
+- **Always on top**
+- **Panel mode** — *anchored to tray* or *free-floating*
+- `RefreshSeconds` — auto-refresh interval (default `300`)
 
-## Credentials (Windows)
+## 🙏 Credits
 
-Config lives at `%APPDATA%\WinCodexBar\config.json` (auto-created on first run). Right-click the tray
-icon → **Edit settings** to open it.
+- Inspired by **[CodexBar](https://github.com/steipete/CodexBar)** by [@steipete](https://github.com/steipete).
+- Built with .NET WinForms.
 
-**Claude** — open `claude.ai` in your browser, DevTools (F12) → Application → Cookies → `https://claude.ai`
-→ copy the value of the `sessionKey` cookie (starts with `sk-ant-sid01-...`) into `SessionKey`.
-It expires after ~30 days; you'll need to repaste it then. (An `sk-ant-admin...` key in `ApiKey` enables
-the spend view instead.)
+## 📄 License
 
-**Copilot** — easiest: right-click the tray icon → **Login to Copilot (device flow)**. Or paste a GitHub
-token with Copilot access into `Token`, or set the `COPILOT_API_TOKEN` environment variable.
-
-**OpenAI** — create an **Admin key** (`sk-admin-...`) at platform.openai.com → Settings → Admin keys, and
-put it in `ApiKey` (or the `OPENAI_ADMIN_KEY` env var). A normal `sk-...` key only gets the legacy
-credit-balance fallback, which most accounts no longer support.
-
-Example `config.json`:
-
-```json
-{
-  "RefreshSeconds": 300,
-  "Providers": [
-    { "Id": "claude",  "Enabled": true, "SessionKey": "sk-ant-sid01-..." },
-    { "Id": "copilot", "Enabled": true, "Token": "gho_..." },
-    { "Id": "openai",  "Enabled": true, "ApiKey": "sk-admin-..." }
-  ]
-}
-```
-
-Keep this file private — it holds secrets.
-
----
-
-## Project layout
-
-```
-Program.cs              entry point
-TrayAppContext.cs       tray icon, menu, refresh loop, popup wiring
-Models.cs               UsageWindow / ProviderSnapshot
-Config.cs               %APPDATA% config load/save
-Providers/
-  IUsageProvider.cs     interface + shared HttpClient
-  ClaudeProvider.cs     claude.ai cookie path (+ admin stub)
-  OpenAiProvider.cs     org costs (+ legacy credit fallback)
-  CopilotProvider.cs    copilot_internal user/quota
-  CopilotDeviceFlow.cs  optional GitHub device-flow login
-UI/
-  IconFactory.cs        runtime-drawn tray icon
-  PopupForm.cs          dark popover with bars + countdowns
-```
-
-Adding a provider = implement `IUsageProvider`, return a `ProviderSnapshot` with `UsageWindow`s, and add it
-to the list in `TrayAppContext`.
-
----
-
-## Known limitations / next steps
-
-- No automatic token refresh — same fragility CodexBar documents. The Copilot device-flow token and Claude
-  cookie will eventually expire and need re-auth.
-- OpenAI shows spend only (the API has no subscription reset windows).
-- No automatic browser-cookie import yet. On Windows that means reading the Chromium cookie DB and
-  decrypting with **DPAPI** (`System.Security.Cryptography.ProtectedData`) — doable in C#, deliberately
-  left out of this starter to keep it simple and avoid crossing an app boundary.
-- A real settings window (instead of editing JSON) and per-provider account switching are obvious additions.
+[MIT](LICENSE)
