@@ -10,3 +10,6 @@ obj/
 
 # Claude Code local state (machine-specific)
 .claude/
+
+# Local release artifacts (zips are attached to GitHub Releases instead)
+release/
