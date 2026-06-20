@@ -24,13 +24,18 @@ internal sealed class TrayAppContext : ApplicationContext
             new ClaudeProvider(),
             new ChatGptProvider(),
             new CopilotProvider(),
+            new DeepSeekProvider(),
         };
 
-        // Make sure every provider has a config entry, then persist defaults.
-        foreach (var p in _providers) _config.For(p.Id);
+        // Make sure every provider has a config entry, and seed the display order.
+        foreach (var p in _providers)
+        {
+            _config.For(p.Id);
+            if (!_config.Ui.ProviderOrder.Contains(p.Id)) _config.Ui.ProviderOrder.Add(p.Id);
+        }
         _config.Save();
 
-        _popup.Configure(_config, () => _config.Save(), () => RefreshAsync());
+        _popup.Configure(_config, () => _config.Save(), () => RefreshAsync(), Quit);
 
         _tray = new NotifyIcon
         {
@@ -66,12 +71,14 @@ internal sealed class TrayAppContext : ApplicationContext
         login.DropDownItems.Add("Claude — tempel sessionKey…", null, async (_, _) => await LoginClaudeSessionKeyAsync());
         login.DropDownItems.Add("ChatGPT / Codex…", null, async (_, _) => await LoginChatGptAsync());
         login.DropDownItems.Add("GitHub Copilot (device)…", null, async (_, _) => await LoginCopilotAsync());
+        login.DropDownItems.Add("DeepSeek — tempel API key…", null, async (_, _) => await LoginDeepSeekAsync());
         menu.Items.Add(login);
 
         var logout = new ToolStripMenuItem("Logout");
         logout.DropDownItems.Add("Claude", null, async (_, _) => await LogoutAsync("claude"));
         logout.DropDownItems.Add("ChatGPT / Codex", null, async (_, _) => await LogoutAsync("chatgpt"));
         logout.DropDownItems.Add("GitHub Copilot", null, async (_, _) => await LogoutAsync("copilot"));
+        logout.DropDownItems.Add("DeepSeek", null, async (_, _) => await LogoutAsync("deepseek"));
         menu.Items.Add(logout);
 
         menu.Items.Add("Settings…", null, (_, _) => ShowSettings());
@@ -89,9 +96,9 @@ internal sealed class TrayAppContext : ApplicationContext
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-            // Only fetch (and therefore only show) providers that are logged in.
+            // Only fetch providers that are logged in AND set to show.
             var tasks = _providers
-                .Where(p => p.IsLoggedIn(_config.For(p.Id)))
+                .Where(p => { var c = _config.For(p.Id); return p.IsLoggedIn(c) && c.Enabled; })
                 .Select(p => SafeFetch(p, _config.For(p.Id), cts.Token))
                 .ToList();
 
@@ -165,10 +172,12 @@ internal sealed class TrayAppContext : ApplicationContext
 
     private void ShowSettings()
     {
-        using var f = new SettingsForm(_config, () =>
+        var list = _providers.Select(p => (p.Id, p.DisplayName)).ToList();
+        using var f = new SettingsForm(_config, list, () =>
         {
             _popup.ApplyUi();
             if (_popup.Visible) _popup.Render(_snapshots);
+            _ = RefreshAsync(); // re-fetch so newly-shown providers load and hidden ones drop
         });
         f.ShowDialog();
     }
@@ -219,6 +228,20 @@ internal sealed class TrayAppContext : ApplicationContext
         {
             MessageBox.Show($"Login ChatGPT gagal: {ex.Message}", "WinCodexBar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
+    }
+
+    private async Task LoginDeepSeekAsync()
+    {
+        var key = Prompt.Text(
+            "DeepSeek — API key",
+            "Tempel API key DeepSeek (diawali sk-...).\n"
+            + "Ambil di platform.deepseek.com → API keys.");
+        if (string.IsNullOrWhiteSpace(key)) return;
+
+        _config.For("deepseek").ApiKey = key.Trim();
+        _config.Save();
+        await RefreshAsync();
+        MessageBox.Show("API key DeepSeek tersimpan.", "WinCodexBar", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private async Task LoginCopilotAsync()

@@ -47,6 +47,16 @@ public enum PopupMode
     Floating,
 }
 
+/// <summary>What the panel's close (×) button does.</summary>
+public enum CloseAction
+{
+    /// <summary>Just hide the panel window (the tray app keeps running).</summary>
+    HideWindow,
+
+    /// <summary>Quit the whole application.</summary>
+    QuitApp,
+}
+
 /// <summary>Look &amp; feel of the popup panel (set from the Settings dialog).</summary>
 public sealed class UiConfig
 {
@@ -60,6 +70,15 @@ public sealed class UiConfig
     /// <summary>Saved position for Floating mode. -1 = not set yet.</summary>
     public int FloatingX { get; set; } = -1;
     public int FloatingY { get; set; } = -1;
+
+    /// <summary>Colour theme name (see <see cref="WinCodexBar.UI.Theme"/>).</summary>
+    public string Theme { get; set; } = "Midnight";
+
+    /// <summary>What the panel's × button does.</summary>
+    public CloseAction CloseButton { get; set; } = CloseAction.HideWindow;
+
+    /// <summary>Display order of provider cards (by id). Reordered by drag-and-drop.</summary>
+    public List<string> ProviderOrder { get; set; } = new();
 }
 
 public sealed class AppConfig

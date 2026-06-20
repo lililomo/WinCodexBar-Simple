@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>WinCodexBar</AssemblyName>
     <RootNamespace>WinCodexBar</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <!-- Run in the tray with no console window -->
     <ApplicationIcon></ApplicationIcon>
   </PropertyGroup>
