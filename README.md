@@ -8,7 +8,7 @@
 <p align="center">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-8.0%20(WinForms)-512BD4">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-7C8CFF">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.2.1-7C8CFF">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 

@@ -46,7 +46,7 @@ public sealed class CopilotProvider : IUsageProvider
             using var res = await Net.Http.SendAsync(req, ct);
             if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 throw new Exception("unauthorized — token invalid or lacks Copilot access");
-            res.EnsureSuccessStatusCode();
+            Net.EnsureOk(res);
 
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
             var root = doc.RootElement;
@@ -72,6 +72,7 @@ public sealed class CopilotProvider : IUsageProvider
             if (snap.Windows.Count == 0)
                 snap.Error = "no quota snapshots in response (API shape may have changed)";
         }
+        catch (RateLimitException) { throw; }
         catch (Exception ex)
         {
             snap.Error = ex.Message;

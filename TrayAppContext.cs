@@ -16,6 +16,11 @@ internal sealed class TrayAppContext : ApplicationContext
     private List<ProviderSnapshot> _snapshots = new();
     private bool _refreshing;
 
+    // Rate-limit resilience: keep the last good snapshot, back off on 429, debounce spammy refreshes.
+    private readonly Dictionary<string, ProviderSnapshot> _lastGood = new();
+    private readonly Dictionary<string, DateTimeOffset> _cooldownUntil = new();
+    private readonly Dictionary<string, DateTimeOffset> _lastFetch = new();
+
     public TrayAppContext()
     {
         _config = AppConfig.Load();
@@ -34,6 +39,9 @@ internal sealed class TrayAppContext : ApplicationContext
             if (!_config.Ui.ProviderOrder.Contains(p.Id)) _config.Ui.ProviderOrder.Add(p.Id);
         }
         _config.Save();
+
+        // Restore last-known usage so the panel shows numbers immediately (and during cooldowns).
+        foreach (var kv in UsageCache.Load()) _lastGood[kv.Key] = kv.Value;
 
         _popup.Configure(_config, () => _config.Save(), () => RefreshAsync(), Quit);
 
@@ -99,11 +107,12 @@ internal sealed class TrayAppContext : ApplicationContext
             // Only fetch providers that are logged in AND set to show.
             var tasks = _providers
                 .Where(p => { var c = _config.For(p.Id); return p.IsLoggedIn(c) && c.Enabled; })
-                .Select(p => SafeFetch(p, _config.For(p.Id), cts.Token))
+                .Select(p => FetchOne(p, cts.Token))
                 .ToList();
 
             var results = await Task.WhenAll(tasks);
             _snapshots = results.ToList();
+            UsageCache.Save(_lastGood);
 
             UpdateIcon();
             if (_popup.Visible) _popup.Render(_snapshots);
@@ -118,16 +127,56 @@ internal sealed class TrayAppContext : ApplicationContext
         }
     }
 
-    private static async Task<ProviderSnapshot> SafeFetch(IUsageProvider p, ProviderConfig cfg, CancellationToken ct)
+    private async Task<ProviderSnapshot> FetchOne(IUsageProvider p, CancellationToken ct)
     {
+        var id = p.Id;
+        var now = DateTimeOffset.UtcNow;
+
+        ProviderSnapshot Cached(string fallbackError) =>
+            _lastGood.TryGetValue(id, out var c)
+                ? c
+                : new ProviderSnapshot { ProviderId = id, DisplayName = p.DisplayName, Error = fallbackError };
+
+        // Backing off after a 429 — don't call the endpoint again until the cooldown passes.
+        if (_cooldownUntil.TryGetValue(id, out var until) && now < until)
+            return Cached($"dibatasi (429) · coba lagi {Eta(until)}");
+
+        // Debounce: ignore rapid re-fetches (e.g. refresh-button spam) when we already have data.
+        if (_lastFetch.TryGetValue(id, out var lf) && now - lf < TimeSpan.FromSeconds(10) && _lastGood.ContainsKey(id))
+            return _lastGood[id];
+
+        _lastFetch[id] = now;
         try
         {
-            return await p.FetchAsync(cfg, ct);
+            var snap = await p.FetchAsync(_config.For(id), ct);
+            if (snap.Ok && snap.Windows.Count > 0)
+            {
+                _lastGood[id] = snap;
+                _cooldownUntil.Remove(id);
+                return snap;
+            }
+            return _lastGood.TryGetValue(id, out var good) ? good : snap; // keep last good on empty/error
+        }
+        catch (RateLimitException ex)
+        {
+            var delay = ex.RetryAfter ?? TimeSpan.FromMinutes(10);
+            if (delay < TimeSpan.FromSeconds(15)) delay = TimeSpan.FromSeconds(15);
+            if (delay > TimeSpan.FromMinutes(15)) delay = TimeSpan.FromMinutes(15); // cap so it recovers within 15m
+            _cooldownUntil[id] = now + delay;
+            return Cached($"dibatasi (429) · coba lagi {Eta(now + delay)}");
         }
         catch (Exception ex)
         {
-            return new ProviderSnapshot { ProviderId = p.Id, DisplayName = p.DisplayName, Error = ex.Message };
+            return Cached(ex.Message);
         }
+    }
+
+    private static string Eta(DateTimeOffset until)
+    {
+        var s = until - DateTimeOffset.UtcNow;
+        if (s <= TimeSpan.Zero) return "segera";
+        if (s.TotalMinutes >= 1) return $"{(int)Math.Ceiling(s.TotalMinutes)}m";
+        return $"{(int)s.TotalSeconds}s";
     }
 
     private void UpdateIcon()

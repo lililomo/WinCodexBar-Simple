@@ -42,7 +42,7 @@ public sealed class DeepSeekProvider : IUsageProvider
         using var res = await Net.Http.SendAsync(req, ct);
         if (res.StatusCode is System.Net.HttpStatusCode.Unauthorized)
             throw new Exception("unauthorized — API key DeepSeek invalid");
-        res.EnsureSuccessStatusCode();
+        Net.EnsureOk(res);
 
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
         var root = doc.RootElement;

@@ -25,6 +25,10 @@ public sealed class ProviderSnapshot
     public string? Error { get; set; }
     public DateTimeOffset FetchedAt { get; set; } = DateTimeOffset.Now;
 
+    /// <summary>Set when the fetch was rejected with HTTP 429; the app then backs off.</summary>
+    public bool RateLimited { get; set; }
+    public TimeSpan? RetryAfter { get; set; }
+
     public bool Ok => Error is null;
 
     /// <summary>Highest utilization across windows, used to colour the tray icon. Null if nothing measurable.</summary>

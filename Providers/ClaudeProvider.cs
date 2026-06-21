@@ -33,6 +33,7 @@ public sealed class ClaudeProvider : IUsageProvider
         if (!string.IsNullOrWhiteSpace(cfg.SessionKey))
         {
             try { await FetchViaWeb(cfg.SessionKey!.Trim(), snap, ct); return snap; }
+            catch (RateLimitException) { throw; }
             catch (Exception ex) { snap.Error = $"web: {ex.Message}"; }
         }
 
@@ -80,6 +81,7 @@ public sealed class ClaudeProvider : IUsageProvider
                 catch { /* fall through */ }
                 snap.Error = "token Claude kedaluwarsa & gagal refresh (pastikan Claude Code login, atau tempel sessionKey).";
             }
+            catch (RateLimitException) { throw; }
             catch (Exception ex)
             {
                 snap.Error = $"oauth: {ex.Message}";
@@ -107,7 +109,7 @@ public sealed class ClaudeProvider : IUsageProvider
         using var res = await Net.Http.SendAsync(req, ct);
         if (res.StatusCode is System.Net.HttpStatusCode.Unauthorized)
             throw new UnauthorizedAccessException("token kedaluwarsa/invalid");
-        res.EnsureSuccessStatusCode();
+        Net.EnsureOk(res); // surfaces 429 as RateLimitException
 
         using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
         var root = doc.RootElement;
@@ -197,7 +199,7 @@ public sealed class ClaudeProvider : IUsageProvider
         using var res = await Net.Http.SendAsync(req, ct);
         if (res.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             throw new Exception("unauthorized — sessionKey kedaluwarsa, ambil ulang dari claude.ai");
-        res.EnsureSuccessStatusCode();
+        Net.EnsureOk(res); // surfaces 429 as RateLimitException
 
         return JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
     }
