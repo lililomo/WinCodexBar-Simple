@@ -22,12 +22,37 @@ public sealed class ClaudeProvider : IUsageProvider
     public bool IsLoggedIn(ProviderConfig cfg) =>
         (cfg.OAuth?.IsValid ?? false)
         || !string.IsNullOrWhiteSpace(cfg.SessionKey)
+        || !string.Equals(cfg.CookieSource, "Manual", StringComparison.OrdinalIgnoreCase)
         || ClaudeCliCreds.TryRead() is not null
         || (!string.IsNullOrWhiteSpace(cfg.ApiKey) && cfg.ApiKey!.StartsWith("sk-ant-admin", StringComparison.Ordinal));
 
     public async Task<ProviderSnapshot> FetchAsync(ProviderConfig cfg, CancellationToken ct)
     {
         var snap = new ProviderSnapshot { ProviderId = Id, DisplayName = DisplayName };
+
+        // 0. Browser cookies (CodexBar-style) — read the claude.ai session straight from the browser.
+        if (!string.Equals(cfg.CookieSource, "Manual", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var cookies = BrowserCookies.ClaudeCookies(cfg.CookieSource);
+                if (cookies is null)
+                {
+                    snap.Error = $"Cookie claude.ai tidak ditemukan di {BrowserCookies.Display(cfg.CookieSource)}. Login claude.ai di browser itu dulu.";
+                    return snap;
+                }
+                await FetchViaCookieHeader(cookies, snap, ct);
+                if (snap.Windows.Count > 0) { snap.Plan ??= "claude.ai"; snap.Error = null; }
+                else if (snap.Error is null) snap.Error = "usage kosong (bentuk API mungkin berubah)";
+                return snap;
+            }
+            catch (RateLimitException) { throw; }
+            catch (Exception ex)
+            {
+                snap.Error = $"cookie ({BrowserCookies.Display(cfg.CookieSource)}): {ex.Message}";
+                return snap;
+            }
+        }
 
         // 1. sessionKey — returns the full usage windows reliably.
         if (!string.IsNullOrWhiteSpace(cfg.SessionKey))
@@ -79,7 +104,7 @@ public sealed class ClaudeProvider : IUsageProvider
                     }
                 }
                 catch { /* fall through */ }
-                snap.Error = "token Claude kedaluwarsa & gagal refresh (pastikan Claude Code login, atau tempel sessionKey).";
+                snap.Error = "Token Claude Code kedaluwarsa & tak bisa di-refresh. Login ulang Claude Code, atau pakai \"tempel sessionKey\".";
             }
             catch (RateLimitException) { throw; }
             catch (Exception ex)
@@ -150,6 +175,41 @@ public sealed class ClaudeProvider : IUsageProvider
         if (!m.TryGetProperty("amount_minor", out var a) || a.ValueKind != JsonValueKind.Number) return null;
         int exp = m.TryGetProperty("exponent", out var e) && e.ValueKind == JsonValueKind.Number ? e.GetInt32() : 2;
         return a.GetDouble() / Math.Pow(10, exp);
+    }
+
+    // Uses the browser's full claude.ai Cookie header (incl. cf_clearance) via curl.exe.
+    private static async Task FetchViaCookieHeader(BrowserCookies.CookieSet ck, ProviderSnapshot snap, CancellationToken ct)
+    {
+        string? orgId = null;
+        using (var orgDoc = await RequestDocCookie("https://claude.ai/api/organizations", ck, ct))
+        {
+            foreach (var org in orgDoc.RootElement.EnumerateArray())
+            {
+                if (!org.TryGetProperty("uuid", out var uuid)) continue;
+                orgId ??= uuid.GetString();
+                if (org.TryGetProperty("capabilities", out var caps) && caps.ValueKind == JsonValueKind.Array)
+                    foreach (var c in caps.EnumerateArray())
+                        if (string.Equals(c.GetString(), "chat", StringComparison.OrdinalIgnoreCase)) { orgId = uuid.GetString(); break; }
+            }
+        }
+        if (string.IsNullOrEmpty(orgId)) throw new Exception("no organization");
+
+        using var usageDoc = await RequestDocCookie($"https://claude.ai/api/organizations/{orgId}/usage", ck, ct);
+        var root = usageDoc.RootElement;
+        AddWindow(snap, root, "five_hour", "Session · 5h");
+        AddWindow(snap, root, "seven_day", "Weekly");
+        AddWindow(snap, root, "seven_day_sonnet", "Weekly · Sonnet");
+        AddWindow(snap, root, "seven_day_opus", "Weekly · Opus");
+        AddSpend(snap, root);
+    }
+
+    private static async Task<JsonDocument> RequestDocCookie(string url, BrowserCookies.CookieSet ck, CancellationToken ct)
+    {
+        var (status, body) = await Curl.GetAsync(url, ck.Header, ck.UserAgent, ct);
+        if (status == 429) throw new RateLimitException(null);
+        if (status is 401 or 403) throw new Exception("cookie ditolak — login ulang claude.ai di browser");
+        if (status is < 200 or >= 300) throw new Exception($"HTTP {status}");
+        return JsonDocument.Parse(body);
     }
 
     private static async Task FetchViaWeb(string sessionKey, ProviderSnapshot snap, CancellationToken ct)

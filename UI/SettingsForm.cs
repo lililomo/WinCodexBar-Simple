@@ -2,7 +2,7 @@ using System.Drawing;
 
 namespace WinCodexBar.UI;
 
-/// <summary>Settings dialog: theme, which AIs to show, transparency, on-top, popup mode, close behavior.</summary>
+/// <summary>Settings dialog: theme, which AIs to show, Claude cookie source, transparency, on-top, popup mode, close behavior.</summary>
 internal sealed class SettingsForm : Form
 {
     private readonly AppConfig _config;
@@ -11,6 +11,9 @@ internal sealed class SettingsForm : Form
 
     private readonly ComboBox _theme = new();
     private readonly Dictionary<string, CheckBox> _show = new();
+    private readonly RadioButton _claudeManual = new();
+    private readonly RadioButton _claudeAuto = new();
+    private readonly ComboBox _claudeBrowser = new();
     private readonly TrackBar _opacity = new();
     private readonly Label _opacityLabel = new();
     private readonly CheckBox _alwaysOnTop = new();
@@ -32,7 +35,7 @@ internal sealed class SettingsForm : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9f);
-        ClientSize = new Size(390, 470 + _providers.Count * 24);
+        ClientSize = new Size(390, 566 + _providers.Count * 24);
 
         Build();
         LoadValues();
@@ -53,16 +56,36 @@ internal sealed class SettingsForm : Form
         // Which AIs to show
         int showH = 26 + _providers.Count * 24 + 8;
         var showGroup = new GroupBox { Text = "Tampilkan AI (yang dicentang saja yang muncul)", Bounds = new Rectangle(x, y, w, showH) };
-        int cy = 22;
+        int cyy = 22;
         foreach (var (id, name) in _providers)
         {
-            var cb = new CheckBox { Text = name, Bounds = new Rectangle(12, cy, w - 30, 22) };
+            var cb = new CheckBox { Text = name, Bounds = new Rectangle(12, cyy, w - 30, 22) };
             _show[id] = cb;
             showGroup.Controls.Add(cb);
-            cy += 24;
+            cyy += 24;
         }
         Controls.Add(showGroup);
         y += showH + 12;
+
+        // Claude cookie source
+        var ck = new GroupBox { Text = "Cookie Claude (sumber sessionKey)", Bounds = new Rectangle(x, y, w, 98) };
+        _claudeManual.SetBounds(12, 20, w - 30, 22);
+        _claudeManual.Text = "Manual (tempel sessionKey lewat menu)";
+        _claudeAuto.SetBounds(12, 44, 120, 24);
+        _claudeAuto.Text = "Otomatis dari:";
+        _claudeBrowser.SetBounds(136, 44, w - 166, 24);
+        _claudeBrowser.DropDownStyle = ComboBoxStyle.DropDownList;
+        _claudeBrowser.Items.AddRange(new object[] { "Auto", "Firefox", "Chrome" });
+        var note = new Label
+        {
+            Text = "Otomatis membaca cookie login claude.ai dari browser.",
+            Bounds = new Rectangle(12, 72, w - 24, 18),
+            ForeColor = SystemColors.GrayText,
+        };
+        _claudeAuto.CheckedChanged += (_, _) => _claudeBrowser.Enabled = _claudeAuto.Checked;
+        ck.Controls.AddRange(new Control[] { _claudeManual, _claudeAuto, _claudeBrowser, note });
+        Controls.Add(ck);
+        y += 108;
 
         _opacityLabel.SetBounds(x, y, w, 18);
         Controls.Add(_opacityLabel);
@@ -115,6 +138,14 @@ internal sealed class SettingsForm : Form
     {
         _theme.SelectedItem = Theme.Names.Contains(_config.Ui.Theme) ? _config.Ui.Theme : "Midnight";
         foreach (var (id, cb) in _show) cb.Checked = _config.For(id).Enabled;
+
+        var cs = _config.For("claude").CookieSource;
+        bool manual = string.IsNullOrEmpty(cs) || string.Equals(cs, "Manual", StringComparison.OrdinalIgnoreCase);
+        _claudeManual.Checked = manual;
+        _claudeAuto.Checked = !manual;
+        _claudeBrowser.SelectedItem = new[] { "Auto", "Firefox", "Chrome" }.Contains(cs) ? cs : "Auto";
+        _claudeBrowser.Enabled = _claudeAuto.Checked;
+
         _opacity.Value = Math.Clamp(_config.Ui.Opacity, _opacity.Minimum, _opacity.Maximum);
         _opacityLabel.Text = $"Transparansi panel: {_opacity.Value}%";
         _alwaysOnTop.Checked = _config.Ui.AlwaysOnTop;
@@ -128,6 +159,7 @@ internal sealed class SettingsForm : Form
     {
         _config.Ui.Theme = _theme.SelectedItem as string ?? "Midnight";
         foreach (var (id, cb) in _show) _config.For(id).Enabled = cb.Checked;
+        _config.For("claude").CookieSource = _claudeAuto.Checked ? (_claudeBrowser.SelectedItem as string ?? "Auto") : "Manual";
         _config.Ui.Opacity = _opacity.Value;
         _config.Ui.AlwaysOnTop = _alwaysOnTop.Checked;
         _config.Ui.PopupMode = _modeFloating.Checked ? PopupMode.Floating : PopupMode.AnchoredToTray;

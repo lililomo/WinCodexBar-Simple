@@ -27,6 +27,7 @@ internal sealed class TrayAppContext : ApplicationContext
         _providers = new List<IUsageProvider>
         {
             new ClaudeProvider(),
+            new ClaudeApiProvider(),
             new ChatGptProvider(),
             new CopilotProvider(),
             new DeepSeekProvider(),
@@ -77,6 +78,7 @@ internal sealed class TrayAppContext : ApplicationContext
         var login = new ToolStripMenuItem("Login");
         login.DropDownItems.Add("Claude — login browser (OAuth)…", null, async (_, _) => await LoginClaudeAsync());
         login.DropDownItems.Add("Claude — tempel sessionKey…", null, async (_, _) => await LoginClaudeSessionKeyAsync());
+        login.DropDownItems.Add("Claude API — tempel API key…", null, async (_, _) => await LoginClaudeApiAsync());
         login.DropDownItems.Add("ChatGPT / Codex…", null, async (_, _) => await LoginChatGptAsync());
         login.DropDownItems.Add("GitHub Copilot (device)…", null, async (_, _) => await LoginCopilotAsync());
         login.DropDownItems.Add("DeepSeek — tempel API key…", null, async (_, _) => await LoginDeepSeekAsync());
@@ -84,6 +86,7 @@ internal sealed class TrayAppContext : ApplicationContext
 
         var logout = new ToolStripMenuItem("Logout");
         logout.DropDownItems.Add("Claude", null, async (_, _) => await LogoutAsync("claude"));
+        logout.DropDownItems.Add("Claude API", null, async (_, _) => await LogoutAsync("claude-api"));
         logout.DropDownItems.Add("ChatGPT / Codex", null, async (_, _) => await LogoutAsync("chatgpt"));
         logout.DropDownItems.Add("GitHub Copilot", null, async (_, _) => await LogoutAsync("copilot"));
         logout.DropDownItems.Add("DeepSeek", null, async (_, _) => await LogoutAsync("deepseek"));
@@ -104,10 +107,13 @@ internal sealed class TrayAppContext : ApplicationContext
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-            // Only fetch providers that are logged in AND set to show.
+            // Show every provider that's checked; fetch the logged-in ones, and show a "please
+            // log in" card for the rest so they don't silently vanish.
             var tasks = _providers
-                .Where(p => { var c = _config.For(p.Id); return p.IsLoggedIn(c) && c.Enabled; })
-                .Select(p => FetchOne(p, cts.Token))
+                .Where(p => _config.For(p.Id).Enabled)
+                .Select(p => p.IsLoggedIn(_config.For(p.Id))
+                    ? FetchOne(p, cts.Token)
+                    : Task.FromResult(NotLoggedIn(p)))
                 .ToList();
 
             var results = await Task.WhenAll(tasks);
@@ -126,6 +132,14 @@ internal sealed class TrayAppContext : ApplicationContext
             _refreshing = false;
         }
     }
+
+    private static ProviderSnapshot NotLoggedIn(IUsageProvider p) => new()
+    {
+        ProviderId = p.Id,
+        DisplayName = p.DisplayName,
+        NotLoggedIn = true,
+        Error = $"Belum login — klik kanan ikon → Login → {p.DisplayName}.",
+    };
 
     private async Task<ProviderSnapshot> FetchOne(IUsageProvider p, CancellationToken ct)
     {
@@ -277,6 +291,21 @@ internal sealed class TrayAppContext : ApplicationContext
         {
             MessageBox.Show($"Login ChatGPT gagal: {ex.Message}", "WinCodexBar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
+    }
+
+    private async Task LoginClaudeApiAsync()
+    {
+        var key = Prompt.Text(
+            "Claude API — API key",
+            "Tempel Anthropic API key.\n"
+            + "• sk-ant-admin… → menampilkan spend (usage biaya)\n"
+            + "• sk-ant-api… → hanya status \"connected\".");
+        if (string.IsNullOrWhiteSpace(key)) return;
+
+        _config.For("claude-api").ApiKey = key.Trim();
+        _config.Save();
+        await RefreshAsync();
+        MessageBox.Show("API key Claude API tersimpan.", "WinCodexBar", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private async Task LoginDeepSeekAsync()

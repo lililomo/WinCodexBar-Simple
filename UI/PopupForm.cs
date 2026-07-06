@@ -317,7 +317,7 @@ internal sealed class PopupForm : Form
 
         if (!s.Ok)
         {
-            using var brErr = new SolidBrush(_theme.Crit);
+            using var brErr = new SolidBrush(s.NotLoggedIn ? _theme.Dim : _theme.Crit);
             g.DrawString(s.Error, small, brErr, new RectangleF(x, y, right - x, 28));
             return;
         }

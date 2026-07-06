@@ -29,6 +29,9 @@ public sealed class ProviderSnapshot
     public bool RateLimited { get; set; }
     public TimeSpan? RetryAfter { get; set; }
 
+    /// <summary>Provider is shown but has no credentials yet (renders a calm "please log in" note).</summary>
+    public bool NotLoggedIn { get; set; }
+
     public bool Ok => Error is null;
 
     /// <summary>Highest utilization across windows, used to colour the tray icon. Null if nothing measurable.</summary>

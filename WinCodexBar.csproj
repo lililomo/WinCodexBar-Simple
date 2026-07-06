@@ -8,9 +8,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>WinCodexBar</AssemblyName>
     <RootNamespace>WinCodexBar</RootNamespace>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <!-- Run in the tray with no console window -->
     <ApplicationIcon></ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Read browser cookie stores (Firefox plaintext, Chrome AES-GCM) for the Claude sessionKey. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
 
 </Project>

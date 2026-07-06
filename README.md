@@ -8,7 +8,7 @@
 <p align="center">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-8.0%20(WinForms)-512BD4">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.2.1-7C8CFF">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-7C8CFF">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
@@ -25,8 +25,9 @@
 ## ✨ Features
 
 - **One-glance usage panel** — session / weekly quota bars, reset countdowns, plan, and pay-as-you-go spend.
-- **Four providers in one place** — Claude, ChatGPT / Codex, GitHub Copilot, and DeepSeek.
-- **Sign in from your browser** — no manual token pasting for Copilot & ChatGPT (OAuth / device flow).
+- **Five providers in one place** — Claude, Claude API, ChatGPT / Codex, GitHub Copilot, and DeepSeek.
+- **Sign in from your browser** — read the Claude session cookie automatically (Firefox / Chrome), plus OAuth / device-flow for Copilot & ChatGPT.
+- **Rate-limit resilient** — single-instance, caches the last good numbers to disk, and backs off on HTTP 429.
 - **5 themes** — Midnight, Slate, Indigo, Forest, and Light.
 - **Drag to reorder** — arrange the provider cards however you like; the order is remembered.
 - **Show / hide providers** — pick which AIs appear, even when you're logged into all of them.
@@ -39,7 +40,8 @@
 
 | Provider | How it authenticates |
 | --- | --- |
-| **Claude** (Pro / Max) | Reuses the token the **Claude Code** CLI already stores in `~/.claude/.credentials.json`, then calls Anthropic's usage API. When the token expires it is refreshed automatically via *delegated refresh* (it runs the official Claude Code CLI). A `claude.ai` `sessionKey` can be pasted as a fallback. |
+| **Claude** (Pro / Max) | Reads the `claude.ai` session **cookie straight from your browser** (Firefox / Chrome / Auto — the CodexBar approach) and shows the 5h / weekly usage. Also works with the Claude Code CLI token, or a pasted `sessionKey`. |
+| **Claude API** | Paste an Anthropic API key. `sk-ant-admin…` shows org spend; a normal `sk-ant-api…` key shows "connected". |
 | **ChatGPT / Codex** | "Sign in with ChatGPT" — browser OAuth (PKCE) on a localhost loopback. Shows plan and login status. |
 | **GitHub Copilot** | GitHub device-flow login (open the URL, enter the code), then reads quota snapshots. |
 | **DeepSeek** | Paste an API key (tray → Login → DeepSeek, or `config.json`). Shows the prepaid account balance/credits. |
@@ -56,9 +58,16 @@ cd WinCodexBar-Simple
 dotnet run
 ```
 
-Or grab a ready-to-run build from the [Releases](https://github.com/lililomo/WinCodexBar-Simple/releases) page (no .NET install needed).
-
 An icon appears in your system tray. Right-click it → **Login** to connect a provider.
+
+## 📦 Install (no .NET, no admin)
+
+Grab the latest from the [Releases](https://github.com/lililomo/WinCodexBar-Simple/releases) page:
+
+- **`WinCodexBar-Setup.exe`** — simple per-user installer. Installs to `%LOCALAPPDATA%\Programs\WinCodexBar`, adds a Start-menu shortcut, and launches the app. **No administrator rights required.**
+- **`WinCodexBar-Portable.zip`** — just unzip and run `WinCodexBar.exe`. Nothing to install.
+
+Both are self-contained (the .NET runtime is bundled). Windows SmartScreen may warn on first run because the build isn't code-signed — choose *More info → Run anyway*.
 
 ## ⚙️ Configuration
 

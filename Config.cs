@@ -35,6 +35,9 @@ public sealed class ProviderConfig
 
     /// <summary>Tokens from a browser OAuth login (Claude Pro/Max, ChatGPT/Codex).</summary>
     public OAuthTokens? OAuth { get; set; }
+
+    /// <summary>Claude only: where to read the sessionKey cookie from — "Manual", "Auto", "Firefox", "Chrome".</summary>
+    public string CookieSource { get; set; } = "Manual";
 }
 
 /// <summary>How the usage panel is positioned.</summary>
