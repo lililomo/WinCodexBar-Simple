@@ -228,10 +228,16 @@ internal sealed class TrayAppContext : ApplicationContext
         var reset = claude?.Windows.FirstOrDefault(w => w.Key == "five_hour")?.ResetsAt;
         if (reset is null) return;
 
-        if (_lastFiveHourReset is DateTimeOffset prev && reset.Value > prev && _config.Ui.NotifyOnReset)
+        // A genuine reset jumps the window ~5 hours forward. The API's resets_at otherwise jitters
+        // by well under a second between calls, so require a big forward jump to avoid false alarms.
+        if (_lastFiveHourReset is DateTimeOffset prev
+            && reset.Value > prev.AddMinutes(30)
+            && _config.Ui.NotifyOnReset)
             NotifyReset();
 
-        _lastFiveHourReset = reset;
+        // Track the max seen (ignore the sub-second jitter that dips backward).
+        if (_lastFiveHourReset is not DateTimeOffset last || reset.Value > last)
+            _lastFiveHourReset = reset;
     }
 
     private void NotifyReset()
