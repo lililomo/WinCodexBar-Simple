@@ -15,6 +15,7 @@ internal sealed class TrayAppContext : ApplicationContext
 
     private List<ProviderSnapshot> _snapshots = new();
     private bool _refreshing;
+    private DateTimeOffset? _lastFiveHourReset;
 
     // Rate-limit resilience: keep the last good snapshot, back off on 429, debounce spammy refreshes.
     private readonly Dictionary<string, ProviderSnapshot> _lastGood = new();
@@ -120,6 +121,7 @@ internal sealed class TrayAppContext : ApplicationContext
             _snapshots = results.ToList();
             UsageCache.Save(_lastGood);
 
+            CheckClaudeReset();
             UpdateIcon();
             if (_popup.Visible) _popup.Render(_snapshots);
         }
@@ -217,6 +219,36 @@ internal sealed class TrayAppContext : ApplicationContext
                 : $"{s.DisplayName}: error");
         var text = string.Join("\n", lines);
         _tray.Text = text.Length > 63 ? text[..63] : text; // NotifyIcon.Text hard limit
+    }
+
+    // Fires a notification when the Claude 5-hour session window rolls over (its resets_at jumps forward).
+    private void CheckClaudeReset()
+    {
+        var claude = _snapshots.FirstOrDefault(s => s.ProviderId == "claude" && s.Ok);
+        var reset = claude?.Windows.FirstOrDefault(w => w.Key == "five_hour")?.ResetsAt;
+        if (reset is null) return;
+
+        if (_lastFiveHourReset is DateTimeOffset prev && reset.Value > prev && _config.Ui.NotifyOnReset)
+            NotifyReset();
+
+        _lastFiveHourReset = reset;
+    }
+
+    private void NotifyReset()
+    {
+        try
+        {
+            System.Media.SystemSounds.Exclamation.Play();
+
+            // Reliable self-drawn banner (Win11 OS toasts are flaky for unregistered apps).
+            var f = new NotificationForm(Theme.Get(_config.Ui.Theme), "Claude",
+                "Sesi 5 jam sudah reset — kuota kembali penuh.");
+            f.Show();
+
+            // Also try the OS toast, as a bonus (shows in Action Center when it works).
+            _tray.ShowBalloonTip(8000, "Claude", "Sesi 5 jam sudah reset — kuota kembali penuh.", ToolTipIcon.Info);
+        }
+        catch { /* notifications are best-effort */ }
     }
 
     private void TogglePopup()

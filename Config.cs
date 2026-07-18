@@ -82,6 +82,9 @@ public sealed class UiConfig
 
     /// <summary>Display order of provider cards (by id). Reordered by drag-and-drop.</summary>
     public List<string> ProviderOrder { get; set; } = new();
+
+    /// <summary>Show a Windows notification + sound when the Claude 5-hour session resets.</summary>
+    public bool NotifyOnReset { get; set; } = true;
 }
 
 public sealed class AppConfig

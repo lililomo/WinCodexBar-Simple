@@ -17,6 +17,7 @@ internal sealed class SettingsForm : Form
     private readonly TrackBar _opacity = new();
     private readonly Label _opacityLabel = new();
     private readonly CheckBox _alwaysOnTop = new();
+    private readonly CheckBox _notifyReset = new();
     private readonly RadioButton _modeAnchored = new();
     private readonly RadioButton _modeFloating = new();
     private readonly RadioButton _closeHide = new();
@@ -35,7 +36,7 @@ internal sealed class SettingsForm : Form
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9f);
-        ClientSize = new Size(390, 566 + _providers.Count * 24);
+        ClientSize = new Size(390, 598 + _providers.Count * 24);
 
         Build();
         LoadValues();
@@ -100,6 +101,11 @@ internal sealed class SettingsForm : Form
         _alwaysOnTop.SetBounds(x, y, w, 24);
         _alwaysOnTop.Text = "Selalu di atas (always on top)";
         Controls.Add(_alwaysOnTop);
+        y += 28;
+
+        _notifyReset.SetBounds(x, y, w, 24);
+        _notifyReset.Text = "Notifikasi + suara saat sesi Claude 5 jam reset";
+        Controls.Add(_notifyReset);
         y += 32;
 
         var modeGroup = new GroupBox { Text = "Mode panel usage", Bounds = new Rectangle(x, y, w, 76) };
@@ -149,6 +155,7 @@ internal sealed class SettingsForm : Form
         _opacity.Value = Math.Clamp(_config.Ui.Opacity, _opacity.Minimum, _opacity.Maximum);
         _opacityLabel.Text = $"Transparansi panel: {_opacity.Value}%";
         _alwaysOnTop.Checked = _config.Ui.AlwaysOnTop;
+        _notifyReset.Checked = _config.Ui.NotifyOnReset;
         _modeAnchored.Checked = _config.Ui.PopupMode == PopupMode.AnchoredToTray;
         _modeFloating.Checked = _config.Ui.PopupMode == PopupMode.Floating;
         _closeHide.Checked = _config.Ui.CloseButton == CloseAction.HideWindow;
@@ -162,6 +169,7 @@ internal sealed class SettingsForm : Form
         _config.For("claude").CookieSource = _claudeAuto.Checked ? (_claudeBrowser.SelectedItem as string ?? "Auto") : "Manual";
         _config.Ui.Opacity = _opacity.Value;
         _config.Ui.AlwaysOnTop = _alwaysOnTop.Checked;
+        _config.Ui.NotifyOnReset = _notifyReset.Checked;
         _config.Ui.PopupMode = _modeFloating.Checked ? PopupMode.Floating : PopupMode.AnchoredToTray;
         _config.Ui.CloseButton = _closeQuit.Checked ? CloseAction.QuitApp : CloseAction.HideWindow;
         _config.Save();

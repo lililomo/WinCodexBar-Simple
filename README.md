@@ -8,7 +8,7 @@
 <p align="center">
   <img alt=".NET" src="https://img.shields.io/badge/.NET-8.0%20(WinForms)-512BD4">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-7C8CFF">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.1-7C8CFF">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
@@ -28,6 +28,7 @@
 - **Five providers in one place** — Claude, Claude API, ChatGPT / Codex, GitHub Copilot, and DeepSeek.
 - **Sign in from your browser** — read the Claude session cookie automatically (Firefox / Chrome), plus OAuth / device-flow for Copilot & ChatGPT.
 - **Rate-limit resilient** — single-instance, caches the last good numbers to disk, and backs off on HTTP 429.
+- **Reset alert** — an on-screen banner + sound when your Claude 5-hour session resets (toggle in Settings).
 - **5 themes** — Midnight, Slate, Indigo, Forest, and Light.
 - **Drag to reorder** — arrange the provider cards however you like; the order is remembered.
 - **Show / hide providers** — pick which AIs appear, even when you're logged into all of them.

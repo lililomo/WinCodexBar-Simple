@@ -292,7 +292,7 @@ public sealed class ClaudeProvider : IUsageProvider
             }
         }
 
-        snap.Windows.Add(new UsageWindow { Label = label, Utilization = util, ResetsAt = reset });
+        snap.Windows.Add(new UsageWindow { Label = label, Key = key, Utilization = util, ResetsAt = reset });
     }
 
     // VERIFY: the Anthropic Admin cost report endpoint/shape before relying on this.

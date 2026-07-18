@@ -5,6 +5,9 @@ public sealed class UsageWindow
 {
     public string Label { get; init; } = "";
 
+    /// <summary>Stable source key (e.g. "five_hour") for logic that must find a specific window.</summary>
+    public string? Key { get; init; }
+
     /// <summary>0.0 .. 1.0 fraction used. Null when the provider only reports spend/credits and has no bar.</summary>
     public double? Utilization { get; init; }
 
